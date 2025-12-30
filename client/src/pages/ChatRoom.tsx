@@ -348,7 +348,7 @@ export function ChatRoom() {
     }
 
     return (
-        <div className="flex h-screen bg-slate-900 text-slate-200 overflow-hidden">
+        <div className="flex h-[100dvh] bg-slate-900 text-slate-200 overflow-hidden">
             {/* Mobile Backdrop */}
             {isMobileMenuOpen && (
                 <div 
@@ -468,7 +468,7 @@ export function ChatRoom() {
                 </div>
 
                 {/* Input */}
-                <div className="p-4 bg-slate-900 border-t border-slate-800 relative">
+                <div className="p-2 md:p-4 bg-slate-900 border-t border-slate-800 relative shrink-0">
                     {/* Emoji Picker Popover */}
                     {showEmojiPicker && (
                         <div className="absolute bottom-20 left-4 z-50 shadow-2xl rounded-xl overflow-hidden border border-slate-700">
@@ -481,12 +481,12 @@ export function ChatRoom() {
                         </div>
                     )}
 
-                    <form onSubmit={sendMessage} className="flex gap-2 max-w-4xl mx-auto items-center">
+                    <form onSubmit={sendMessage} className="flex gap-1 md:gap-2 max-w-4xl mx-auto items-center">
                         <button 
                             type="button"
                             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                             className={clsx(
-                                "p-2 rounded-xl transition-colors", 
+                                "p-2 rounded-xl transition-colors shrink-0", 
                                 showEmojiPicker ? "bg-slate-800 text-blue-400" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
                             )}
                         >
@@ -496,7 +496,7 @@ export function ChatRoom() {
                         <button 
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
+                            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors shrink-0"
                         >
                             <ImageIcon className="w-6 h-6" />
                         </button>
@@ -514,12 +514,12 @@ export function ChatRoom() {
                             onChange={(e) => setInputValue(e.target.value)}
                             onClick={() => setShowEmojiPicker(false)}
                             placeholder="Type a secure message..."
-                            className="flex-1 bg-slate-800 border-slate-700 border text-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-slate-600"
+                            className="flex-1 min-w-0 bg-slate-800 border-slate-700 border text-slate-200 rounded-xl px-3 py-2 md:px-4 md:py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-slate-600"
                         />
                         <button 
                             type="submit" 
                             disabled={!inputValue.trim()}
-                            className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-3 py-2 md:px-4 md:py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
                         >
                             <Send className="w-5 h-5" />
                         </button>
