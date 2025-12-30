@@ -7,5 +7,5 @@ export default defineConfig({
   // GitHub Pages deployment usually requires setting the base.
   // If you are deploying to https://<USERNAME>.github.io/<REPO>/, this should be '/<REPO>/'
   // For safety, we default to a relative path, which works in most static hosting environments.
-  base: './',
+  base: '/letschat/',
 })
