@@ -1,135 +1,68 @@
-# LetsChat - Secure, Anonymous, Ephemeral.
+# LetsChat
 
-**LetsChat** is a privacy-first, end-to-end encrypted chat application designed for ephemeral, anonymous communication. It operates on a "Trust No One" architecture where the server acts purely as a blind relay and never has access to message content or decryption keys.
+A minimalist, privacy-focused chat application featuring end-to-end encryption (E2EE) and a zero-knowledge architecture.
 
-## ✨ Key Features
+**Live Demo:** [https://kaeose.github.io/letschat/](https://kaeose.github.io/letschat/)
 
-*   **🔒 End-to-End Encryption:** All messages, usernames, and metadata are encrypted on the client side using **AES-GCM (256-bit)** before they ever touch the network.
-*   **🙈 Trust No One (Blind Server):** The server has zero knowledge of the encryption keys. It cannot read messages even if it wanted to.
-*   **QP Ephemeral & Anonymous:** No database. No accounts. No login. Messages exist only in RAM and are lost forever once the session ends.
-*   **🔗 Secure URL Sharing:**
-    *   **Auto-Masking:** Sensitive keys in the URL are immediately removed from the address bar and stored in the browser's History State to prevent shoulder surfing.
-    *   **Anti-Leak:** Implements `<meta name="referrer" content="no-referrer">` to prevent leaking keys to third-party sites via links.
-*   **⚡ Modern Tech Stack:**
-    *   **Frontend:** React (Vite), Tailwind CSS, Web Crypto API.
-    *   **Backend:** Node.js, Express, Socket.io.
+## Overview
 
----
+LetsChat is designed for ephemeral, anonymous communication. It utilizes a "Trust No One" model where the server acts strictly as a blind relay, with no access to message content or decryption keys.
 
-## 🛡️ Security Architecture
+### Core Features
+- **End-to-End Encryption:** All data (messages, metadata) is encrypted client-side using **AES-GCM (256-bit)** via the Web Crypto API.
+- **Zero-Knowledge Relay:** The server never receives raw keys or unencrypted data.
+- **Ephemeral State:** No database or persistence. All data exists only in memory and is wiped on session termination.
+- **Secure Key Exchange:** Keys are transmitted via URL fragments (which are never sent to the server) and immediately masked in the browser history to prevent leakage.
 
-### 1. Authentication: The "Lock & Key" Protocol
-How does the server allow users to join a room without knowing the room's secret key? We use a **Derived Key** approach.
-
-1.  **Raw Key (K):** Generated on the client. Never leaves the browser.
-2.  **Token (T):** Derived from K. Used by clients to prove they have the key.
-3.  **Server Hash (S):** Derived from T. Stored by the server to verify T.
-
-Because cryptographic hash functions are one-way, the server can verify `T` matches `S`, but cannot reverse `S` to get `T`, nor reverse `T` to get `K`.
-
-```mermaid
-sequenceDiagram
-    participant Creator
-    participant Server
-    participant Joiner
-
-    Note over Creator: Generates RawKey (K)<br/>(Browser Memory)
-
-    Creator->>Creator: Derive Token (T) = HMAC(K, "auth")
-    Creator->>Creator: Derive Hash (S) = HMAC(T, "verify")
-
-    Creator->>Server: Create Room (Send S only)
-    Note over Server: Server stores S.<br/>Server does NOT know T or K.
-
-    Note over Joiner: Click Link with #RawKey
-
-    Joiner->>Joiner: Derive Token (T) = HMAC(K, "auth")
-    Joiner->>Server: Join Room (Send T)
-
-    Note over Server: Verifies: HMAC(T, "verify") == S?
-    Server-->>Joiner: Success / Failure
-```
-
-### 2. Encryption: Message Transport
-Once authenticated, how are messages exchanged?
-
-1.  **AES-GCM:** We use the Web Crypto API to perform authenticated encryption.
-2.  **Payload:** The ciphertext and the Initialization Vector (IV) are sent.
-3.  **Forwarding:** The server blindly broadcasts this payload to other sockets in the room.
-
-```mermaid
-sequenceDiagram
-    participant Alice (Client A)
-    participant Server (Relay)
-    participant Bob (Client B)
-
-    Note over Alice, Bob: Both possess RawKey (K) from URL
-
-    Alice->>Alice: Encrypt(Message, K)<br/>Output: {Ciphertext, IV}
-    Alice->>Server: Send {Ciphertext, IV}
-    
-    Note over Server: Server sees only random bytes.<br/>Cannot decrypt.
-    
-    Server->>Bob: Broadcast {Ciphertext, IV}
-    
-    Bob->>Bob: Decrypt({Ciphertext, IV}, K)
-    Note over Bob: Message displayed
-```
+## Tech Stack
+- **Frontend:** React, TypeScript, Vite, Tailwind CSS.
+- **Backend:** Node.js, Socket.io.
+- **Security:** Web Crypto API (AES-GCM, HMAC-SHA256).
 
 ---
 
-## 🚀 Getting Started
+## Security Architecture
+
+### 1. Authentication Protocol
+Uses a derived key approach to allow room access without the server knowing the room's secret.
+
+1. **Raw Key (K):** Stays in the browser.
+2. **Token (T):** `HMAC(K, "auth")`. Used by clients to authenticate.
+3. **Server Hash (S):** `HMAC(T, "verify")`. Stored by server to verify `T`.
+
+The server can verify `T` matches `S` but cannot reverse the hash to obtain the original key `K`.
+
+### 2. Message Transport
+Messages are encrypted using AES-GCM before transmission. The server blindly broadcasts the `{ ciphertext, iv }` payload to participants.
+
+---
+
+## Local Development
 
 ### Prerequisites
-*   Node.js (v18 or higher)
-*   npm
+- Node.js (v18+)
+- npm
 
-### 1. Start the Relay Server
-The server handles the WebSocket connections.
+### Setup
 
-```bash
-cd server
-npm install
-npm start
-# Server runs on http://localhost:3001
-```
+1. **Relay Server**
+   ```bash
+   cd server
+   npm install
+   npm start
+   ```
 
-### 2. Start the Client
-The frontend interface.
+2. **Client**
+   ```bash
+   cd client
+   npm install
+   npm run dev
+   ```
 
-```bash
-cd client
-npm install
-npm run dev
-# Client runs on http://localhost:5173
-```
+## Deployment
 
-### 3. Usage
-1.  Open the Client URL.
-2.  Enter the Relay Server URL (default is localhost).
-3.  Click **Create Secure Room**.
-4.  Copy the secure link (click "Copy Link" at the top).
-5.  Send the link to a friend.
+- **Frontend:** Static SPA, deployable to GitHub Pages, Vercel, or Netlify.
+- **Backend:** Node.js environment supporting WebSockets (Render, Railway, etc.).
 
----
-
-## 📦 Deployment
-
-### Client (GitHub Pages)
-The client is a static SPA and can be hosted anywhere (GitHub Pages, Vercel, Netlify).
-This project includes a GitHub Action to deploy to **GitHub Pages** automatically.
-
-1.  Push code to GitHub.
-2.  Enable "GitHub Actions" as the source in Repo Settings -> Pages.
-3.  The workflow will build and deploy.
-
-### Server
-The server must be hosted on a platform that supports Node.js and WebSockets (e.g., Render, Railway, Zeabur, DigitalOcean).
-
-*   **Environment Variables:**
-    *   `PORT`: (Optional) Port to run on. Default 3001.
-
----
-
-## ⚠️ Disclaimer
-This project is for educational and privacy-enhancing purposes. While it uses standard cryptographic algorithms (AES-GCM, SHA-256), "perfect" security is a moving target. Use at your own risk.
+## Disclaimer
+Educational project. While it uses standard cryptographic primitives, security is a moving target. Use at your own risk.
