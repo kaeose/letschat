@@ -1,0 +1,394 @@
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { io, Socket } from 'socket.io-client';
+import { Send, Copy, Users, LogOut, ShieldCheck, AlertCircle } from 'lucide-react';
+import { CryptoHelper } from '../lib/crypto';
+import clsx from 'clsx';
+
+interface Message {
+    id: string;
+    senderId: string;
+    text: string; // Decrypted text
+    timestamp: number;
+    isSystem?: boolean;
+    senderName?: string;
+}
+
+interface User {
+    id: string;
+    encryptedUsername: string;
+    displayName?: string; // Decrypted locally
+}
+
+export function ChatRoom() {
+    const { id: roomId } = useParams();
+    const { hash, state, search, pathname } = useLocation();
+    const navigate = useNavigate();
+    
+    // 1. Determine Key and Server (Priority: State > URL)
+    // We try to grab them from state first (clean URL mode), then from URL (first load)
+    const urlSearchParams = new URLSearchParams(search);
+    
+    const rawKey = state?.key || (hash.length > 1 ? hash.substring(1) : "");
+    const serverUrl = state?.server || urlSearchParams.get('server') || 'http://localhost:3001';
+    
+    // State
+    const [username, setUsername] = useState<string>(state?.username || "");
+    const [joinName, setJoinName] = useState("");
+    
+    const [messages, setMessages] = useState<Message[]>([]);
+    const [inputValue, setInputValue] = useState("");
+    const [users, setUsers] = useState<User[]>([]);
+    const [status, setStatus] = useState<'connecting' | 'connected' | 'error' | 'joining'>('joining');
+    const [myId, setMyId] = useState<string>("");
+    
+    const socketRef = useRef<Socket | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // 2. Auto-Hide URL Secrets (Masking)
+    useEffect(() => {
+        // If we have secrets in the URL (hash or search), move them to State and clean URL
+        if (hash || search) {
+            navigate(pathname, {
+                replace: true,
+                state: { 
+                    key: rawKey, 
+                    server: serverUrl, 
+                    username: username // Preserve username if it exists
+                }
+            });
+        }
+    }, [hash, search, pathname, rawKey, serverUrl, username, navigate]);
+
+    // 3. Connection Logic
+    useEffect(() => {
+        if (!roomId || !rawKey) {
+            if (!hash && !state?.key) {
+                // Only redirect if we truly have no key in URL OR State
+                navigate('/');
+            }
+            return;
+        }
+        
+        // If we don't have a username yet, don't connect. Wait for user input.
+        if (!username) {
+            setStatus('joining');
+            return;
+        }
+
+        setStatus('connecting');
+        let activeSocket: Socket | null = null;
+        let mounted = true;
+
+        const init = async () => {
+            try {
+                // 1. Derive Auth Token
+                const keys = await CryptoHelper.deriveAuthKeys(rawKey);
+                
+                if (!mounted) return;
+
+                // 2. Encrypt My Username
+                const encryptedNameObj = await CryptoHelper.encrypt(username, rawKey);
+                // We combine IV and Ciphertext for transport: iv:ciphertext
+                const packedName = `${encryptedNameObj.iv}:${encryptedNameObj.ciphertext}`;
+
+                // 3. Connect Socket
+                const socket = io(serverUrl, {
+                    auth: {
+                        chatId: roomId,
+                        token: keys.token,
+                        encryptedUsername: packedName
+                    }
+                });
+
+                activeSocket = socket;
+                socketRef.current = socket;
+
+                socket.on('connect', () => {
+                    if (mounted) {
+                        setStatus('connected');
+                        setMyId(socket.id || "");
+                    }
+                });
+
+                socket.on('connect_error', (err) => {
+                    console.error("Connection Error:", err.message);
+                    if (mounted) setStatus('error');
+                });
+
+                socket.on('room_users', async (serverUsers: User[]) => {
+                    if (!mounted) return;
+                    // Decrypt all usernames
+                    const decryptedUsers = await Promise.all(serverUsers.map(async u => {
+                        const name = await decryptString(u.encryptedUsername, rawKey);
+                        return { ...u, displayName: name || "Unknown" };
+                    }));
+                    setUsers(decryptedUsers);
+                });
+
+                socket.on('user_joined', async (user: User) => {
+                    if (!mounted) return;
+                    const name = await decryptString(user.encryptedUsername, rawKey);
+                    const decryptedUser = { ...user, displayName: name || "Unknown" };
+                    setUsers(prev => [...prev, decryptedUser]);
+                    addSystemMessage(`${name || "Someone"} joined the secure channel.`);
+                });
+
+                socket.on('user_left', async (user: User) => {
+                    if (!mounted) return;
+                    const name = await decryptString(user.encryptedUsername, rawKey);
+                    setUsers(prev => prev.filter(u => u.id !== user.id));
+                    addSystemMessage(`${name || "Someone"} left.`);
+                });
+
+                socket.on('msg', async (payload: { ciphertext: string; iv: string; senderId: string }) => {
+                    if (!mounted) return;
+                    const decryptedText = await CryptoHelper.decrypt(payload, rawKey);
+                    if (decryptedText) {
+                        setMessages(prev => [...prev, {
+                            id: Math.random().toString(36),
+                            senderId: payload.senderId,
+                            text: decryptedText,
+                            timestamp: Date.now()
+                        }]);
+                    }
+                });
+
+            } catch (e) {
+                console.error(e);
+                if (mounted) setStatus('error');
+            }
+        };
+
+        init();
+
+        return () => {
+            mounted = false;
+            if (activeSocket) {
+                activeSocket.disconnect();
+            }
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+            }
+        };
+    }, [roomId, rawKey, serverUrl, username]); 
+
+    // Helper to decrypt packed string "iv:ciphertext"
+    const decryptString = async (packed: string, key: string) => {
+        if (!packed || !packed.includes(':')) return null;
+        const [iv, ciphertext] = packed.split(':');
+        return await CryptoHelper.decrypt({ iv, ciphertext }, key);
+    };
+
+    const addSystemMessage = (text: string) => {
+        setMessages(prev => [...prev, {
+            id: Math.random().toString(),
+            senderId: "system",
+            text,
+            timestamp: Date.now(),
+            isSystem: true
+        }]);
+    };
+
+    const sendMessage = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!inputValue.trim() || !socketRef.current) return;
+
+        const text = inputValue;
+        setInputValue("");
+
+        // Encrypt
+        const encrypted = await CryptoHelper.encrypt(text, rawKey);
+        
+        // Optimistic UI update
+        setMessages(prev => [...prev, {
+            id: Math.random().toString(),
+            senderId: socketRef.current?.id || "me",
+            text: text,
+            timestamp: Date.now()
+        }]);
+
+        // Send
+        socketRef.current.emit('msg', { ...encrypted, senderId: socketRef.current.id });
+    };
+
+    const copyLink = () => {
+        // Reconstruct the full URL for sharing
+        const origin = window.location.origin;
+        const encodedServer = encodeURIComponent(serverUrl);
+        const fullLink = `${origin}/room/${roomId}?server=${encodedServer}#${rawKey}`;
+        
+        navigator.clipboard.writeText(fullLink);
+        alert("Encrypted link copied to clipboard! Share it securely.");
+    };
+
+    const handleJoin = () => {
+        if (joinName.trim()) {
+            // Update History State with ALL info (Key, Server, Username) so it survives refresh
+            navigate(pathname, { 
+                state: { 
+                    key: rawKey,
+                    server: serverUrl,
+                    username: joinName 
+                },
+                replace: true 
+            });
+            setUsername(joinName);
+        }
+    };
+
+    if (status === 'error') {
+        return (
+            <div className="h-screen flex items-center justify-center bg-slate-900 text-red-400 flex-col gap-4">
+                <AlertCircle className="w-16 h-16" />
+                <h2 className="text-2xl font-bold">Access Denied</h2>
+                <p className="text-slate-400">Invalid link or authentication failed.</p>
+                <button onClick={() => navigate('/')} className="px-4 py-2 bg-slate-800 rounded hover:bg-slate-700 text-white">Go Home</button>
+            </div>
+        );
+    }
+
+    if (!username) {
+         return (
+            <div className="h-screen flex items-center justify-center bg-slate-900 text-slate-200">
+                <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-sm w-full space-y-6 border border-slate-700">
+                    <div className="text-center">
+                        <ShieldCheck className="w-12 h-12 text-blue-400 mx-auto mb-4" />
+                        <h2 className="text-2xl font-bold">Join Secure Room</h2>
+                        <p className="text-slate-400 text-sm mt-2">Enter a display name to join this encrypted chat.</p>
+                    </div>
+                    <div className="space-y-4">
+                        <input
+                            type="text"
+                            placeholder="Display Name"
+                            value={joinName}
+                            onChange={(e) => setJoinName(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                            className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                            autoFocus
+                        />
+                        <button 
+                            onClick={handleJoin}
+                            disabled={!joinName.trim()}
+                            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-50"
+                        >
+                            Join Chat
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex h-screen bg-slate-900 text-slate-200 overflow-hidden">
+            {/* Sidebar (Desktop) */}
+            <div className="hidden md:flex flex-col w-64 bg-slate-950 border-r border-slate-800 p-4">
+                <div className="flex items-center gap-2 mb-8 text-emerald-400 font-bold">
+                    <ShieldCheck className="w-6 h-6" />
+                    <span>Secure Room</span>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto">
+                    <div className="flex items-center gap-2 text-slate-500 mb-4 text-sm uppercase tracking-wider font-semibold">
+                        <Users className="w-4 h-4" />
+                        <span>Online ({users.length})</span>
+                    </div>
+                    <ul className="space-y-2">
+                        {users.map(u => (
+                            <li key={u.id} className={clsx("flex items-center gap-2 p-2 rounded", u.id === myId ? "bg-slate-800/50 text-blue-300" : "text-slate-400")}>
+                                <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                <span className="truncate text-sm font-medium">{u.displayName} {u.id === myId && "(You)"}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+
+                <button onClick={() => navigate('/')} className="flex items-center gap-2 text-slate-500 hover:text-red-400 transition-colors mt-4 text-sm">
+                    <LogOut className="w-4 h-4" />
+                    Leave Room
+                </button>
+            </div>
+
+            {/* Main Chat */}
+            <div className="flex-1 flex flex-col relative">
+                {/* Header */}
+                <div className="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur z-10">
+                    <div className="flex items-center gap-4">
+                        <div className="md:hidden">
+                            <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                        </div>
+                        <div>
+                            <h1 className="font-semibold text-white">Anonymous Chat</h1>
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                                Encrypted
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={copyLink} className="flex items-center gap-2 px-3 py-1.5 bg-blue-600/10 text-blue-400 hover:bg-blue-600/20 rounded-lg text-sm transition-colors border border-blue-600/20">
+                        <Copy className="w-4 h-4" />
+                        <span className="hidden sm:inline">Copy Link</span>
+                    </button>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                    <div className="flex justify-center my-4">
+                        <span className="text-xs bg-slate-800 text-slate-500 px-3 py-1 rounded-full">
+                            Messages are end-to-end encrypted. Not even the server can read them.
+                        </span>
+                    </div>
+                    
+                    {messages.map((msg) => {
+                        const isMe = msg.senderId === myId;
+                        
+                        if (msg.isSystem) {
+                            return (
+                                <div key={msg.id} className="flex justify-center my-2">
+                                    <span className="text-xs text-slate-600">{msg.text}</span>
+                                </div>
+                            );
+                        }
+
+                        // Find sender name
+                        const senderName = users.find(u => u.id === msg.senderId)?.displayName || "Unknown";
+
+                        return (
+                            <div key={msg.id} className={clsx("flex flex-col max-w-[80%]", isMe ? "ml-auto items-end" : "mr-auto items-start")}>
+                                <span className="text-[10px] text-slate-500 mb-1 px-1">{isMe ? "You" : senderName}</span>
+                                <div className={clsx(
+                                    "px-4 py-2 rounded-2xl break-words",
+                                    isMe ? "bg-blue-600 text-white rounded-tr-sm" : "bg-slate-800 text-slate-200 rounded-tl-sm"
+                                )}>
+                                    {msg.text}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                {/* Input */}
+                <div className="p-4 bg-slate-900 border-t border-slate-800">
+                    <form onSubmit={sendMessage} className="flex gap-2 max-w-4xl mx-auto">
+                        <input
+                            type="text"
+                            value={inputValue}
+                            onChange={(e) => setInputValue(e.target.value)}
+                            placeholder="Type a secure message..."
+                            className="flex-1 bg-slate-800 border-slate-700 border text-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-slate-600"
+                        />
+                        <button 
+                            type="submit" 
+                            disabled={!inputValue.trim()}
+                            className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <Send className="w-5 h-5" />
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    );
+}
