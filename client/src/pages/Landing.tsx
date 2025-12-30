@@ -49,19 +49,19 @@ export function Landing() {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100">
-            <div className="max-w-md w-full text-center space-y-8">
-                <div className="flex justify-center mb-8">
-                    <div className="bg-blue-600/20 p-6 rounded-full ring-1 ring-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.2)]">
-                        <Shield className="w-16 h-16 text-blue-400" />
+        <div className="min-h-[100dvh] flex flex-col items-center justify-center p-6 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-slate-100">
+            <div className="max-w-md w-full text-center space-y-6 my-auto">
+                <div className="flex justify-center">
+                    <div className="bg-blue-600/20 p-5 rounded-full ring-1 ring-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.2)]">
+                        <Shield className="w-12 h-12 text-blue-400" />
                     </div>
                 </div>
 
-                <h1 className="text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 pb-2">
+                <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 pb-2">
                     LetsChat
                 </h1>
 
-                <div className="pt-8 space-y-4">
+                <div className="pt-4 space-y-4">
                     <div className="space-y-2 text-left">
                         <label className="text-xs text-slate-500 uppercase font-bold tracking-wider ml-1">Username</label>
                         <input
@@ -114,7 +114,7 @@ export function Landing() {
                 </div>
             </div>
             
-            <div className="absolute bottom-8 text-slate-600 text-xs text-center max-w-sm">
+            <div className="mt-12 text-slate-600 text-[10px] sm:text-xs text-center max-w-sm pb-4">
                 Encryption happens in your browser using AES-GCM. 
                 The URL hash contains the key and is never sent to the server.
             </div>
