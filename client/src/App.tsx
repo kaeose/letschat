@@ -4,7 +4,7 @@ import { ChatRoom } from './pages/ChatRoom';
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/" element={<Landing />} />
         <Route path="/room/:id" element={<ChatRoom />} />
