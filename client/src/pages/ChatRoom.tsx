@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import { Send, Copy, Users, LogOut, ShieldCheck, AlertCircle } from 'lucide-react';
+import { Send, Copy, Users, LogOut, ShieldCheck, AlertCircle, Menu, X } from 'lucide-react';
 import { CryptoHelper } from '../lib/crypto';
 import clsx from 'clsx';
 
@@ -35,6 +35,7 @@ export function ChatRoom() {
     // State
     const [username, setUsername] = useState<string>(state?.username || "");
     const [joinName, setJoinName] = useState("");
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState("");
