@@ -295,11 +295,30 @@ export function ChatRoom() {
 
     return (
         <div className="flex h-screen bg-slate-900 text-slate-200 overflow-hidden">
-            {/* Sidebar (Desktop) */}
-            <div className="hidden md:flex flex-col w-64 bg-slate-950 border-r border-slate-800 p-4">
-                <div className="flex items-center gap-2 mb-8 text-emerald-400 font-bold">
-                    <ShieldCheck className="w-6 h-6" />
-                    <span>Secure Room</span>
+            {/* Mobile Backdrop */}
+            {isMobileMenuOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                />
+            )}
+
+            {/* Sidebar (Desktop & Mobile) */}
+            <div className={clsx(
+                "flex flex-col w-64 bg-slate-950 border-r border-slate-800 p-4 transition-transform duration-300 ease-in-out z-50",
+                "md:translate-x-0 md:static md:h-auto", // Desktop: Always visible, static
+                "fixed inset-y-0 left-0", // Mobile: Fixed position
+                isMobileMenuOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full" // Mobile: Toggle visibility
+            )}>
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center gap-2 text-emerald-400 font-bold">
+                        <ShieldCheck className="w-6 h-6" />
+                        <span>Secure Room</span>
+                    </div>
+                    {/* Close button for mobile */}
+                    <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-400 hover:text-white">
+                        <X className="w-6 h-6" />
+                    </button>
                 </div>
                 
                 <div className="flex-1 overflow-y-auto">
@@ -324,13 +343,16 @@ export function ChatRoom() {
             </div>
 
             {/* Main Chat */}
-            <div className="flex-1 flex flex-col relative">
+            <div className="flex-1 flex flex-col relative w-full">
                 {/* Header */}
-                <div className="h-16 border-b border-slate-800 flex items-center justify-between px-6 bg-slate-900/50 backdrop-blur z-10">
+                <div className="h-16 border-b border-slate-800 flex items-center justify-between px-4 md:px-6 bg-slate-900/50 backdrop-blur z-10">
                     <div className="flex items-center gap-4">
-                        <div className="md:hidden">
-                            <ShieldCheck className="w-6 h-6 text-emerald-400" />
-                        </div>
+                        <button 
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            className="md:hidden p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                        >
+                            <Menu className="w-6 h-6" />
+                        </button>
                         <div>
                             <h1 className="font-semibold text-white">Anonymous Chat</h1>
                             <div className="flex items-center gap-1 text-xs text-slate-500">

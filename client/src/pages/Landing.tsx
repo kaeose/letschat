@@ -60,11 +60,6 @@ export function Landing() {
                 <h1 className="text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-emerald-400 pb-2">
                     LetsChat
                 </h1>
-                
-                <p className="text-slate-400 text-lg leading-relaxed">
-                    End-to-End Encrypted. Anonymous. Ephemeral.<br/>
-                    <span className="text-slate-500 text-sm">Server knows nothing. You hold the keys.</span>
-                </p>
 
                 <div className="pt-8 space-y-4">
                     <div className="space-y-2 text-left">
