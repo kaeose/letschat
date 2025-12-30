@@ -45,6 +45,11 @@ export function ChatRoom() {
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    // Auto-scroll to bottom when messages change
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
     // 2. Auto-Hide URL Secrets (Masking)
     useEffect(() => {
         // If we have secrets in the URL (hash or search), move them to State and clean URL
