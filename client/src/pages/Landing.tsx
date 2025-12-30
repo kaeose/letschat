@@ -8,7 +8,7 @@ export function Landing() {
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [username, setUsername] = useState("");
-    const [relayUrl, setRelayUrl] = useState("http://localhost:3001");
+    const [relayUrl, setRelayUrl] = useState("https://letschat-03sh.onrender.com");
 
     const handleCreate = async () => {
         if (!username.trim()) {
@@ -67,17 +67,6 @@ export function Landing() {
                 </p>
 
                 <div className="pt-8 space-y-4">
-                     <div className="space-y-2 text-left">
-                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider ml-1">Relay Server</label>
-                        <input
-                            type="text"
-                            placeholder="http://localhost:3001"
-                            value={relayUrl}
-                            onChange={(e) => setRelayUrl(e.target.value)}
-                            className="w-full px-6 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 placeholder:text-slate-600 transition-all font-mono text-sm"
-                        />
-                    </div>
-
                     <div className="space-y-2 text-left">
                         <label className="text-xs text-slate-500 uppercase font-bold tracking-wider ml-1">Username</label>
                         <input
@@ -87,6 +76,26 @@ export function Landing() {
                             onChange={(e) => setUsername(e.target.value)}
                             className="w-full px-6 py-4 bg-slate-800/50 border border-slate-700 rounded-xl text-lg focus:outline-none focus:ring-2 focus:ring-blue-500/50 placeholder:text-slate-600 transition-all"
                         />
+                    </div>
+
+                    <div className="space-y-2 text-left">
+                        <label className="text-xs text-slate-500 uppercase font-bold tracking-wider ml-1">Relay Server</label>
+                        <input
+                            type="text"
+                            placeholder="https://letschat-03sh.onrender.com"
+                            value={relayUrl}
+                            onChange={(e) => setRelayUrl(e.target.value)}
+                            className="w-full px-6 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 placeholder:text-slate-600 transition-all font-mono text-sm"
+                        />
+                        <div className="px-1 pt-1">
+                            <p className="text-xs text-slate-500 leading-normal">
+                                <span className="text-amber-500/80 font-semibold">Demo Notice:</span> This default server is for demonstration only. Please 
+                                <a href="https://github.com/kaeose/letschat" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline mx-1">
+                                    deploy your own relay server
+                                </a> 
+                                from the source code.
+                            </p>
+                        </div>
                     </div>
 
                     <button
