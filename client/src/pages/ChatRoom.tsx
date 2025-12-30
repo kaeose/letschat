@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import { Send, Copy, Users, LogOut, ShieldCheck, AlertCircle, Menu, X } from 'lucide-react';
+import { Send, Copy, Users, LogOut, ShieldCheck, AlertCircle, Menu, X, Smile, Image as ImageIcon } from 'lucide-react';
+import EmojiPicker, { type EmojiClickData, Theme } from 'emoji-picker-react';
 import { CryptoHelper } from '../lib/crypto';
 import clsx from 'clsx';
+
+interface MessageContent {
+    type: 'text' | 'image';
+    content: string;
+}
 
 interface Message {
     id: string;
     senderId: string;
-    text: string; // Decrypted text
+    content: MessageContent; // Parsed content
     timestamp: number;
     isSystem?: boolean;
     senderName?: string;
@@ -39,12 +45,14 @@ export function ChatRoom() {
     
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputValue, setInputValue] = useState("");
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [users, setUsers] = useState<User[]>([]);
     const [status, setStatus] = useState<'connecting' | 'connected' | 'error' | 'joining'>('joining');
     const [myId, setMyId] = useState<string>("");
     
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Auto-scroll to bottom when messages change
     useEffect(() => {
@@ -151,10 +159,22 @@ export function ChatRoom() {
                     if (!mounted) return;
                     const decryptedText = await CryptoHelper.decrypt(payload, rawKey);
                     if (decryptedText) {
+                        let content: MessageContent;
+                        try {
+                            const parsed = JSON.parse(decryptedText);
+                            if (parsed && (parsed.type === 'text' || parsed.type === 'image') && typeof parsed.content === 'string') {
+                                content = parsed;
+                            } else {
+                                content = { type: 'text', content: decryptedText };
+                            }
+                        } catch {
+                            content = { type: 'text', content: decryptedText };
+                        }
+
                         setMessages(prev => [...prev, {
                             id: Math.random().toString(36),
                             senderId: payload.senderId,
-                            text: decryptedText,
+                            content: content,
                             timestamp: Date.now()
                         }]);
                     }
@@ -190,32 +210,65 @@ export function ChatRoom() {
         setMessages(prev => [...prev, {
             id: Math.random().toString(),
             senderId: "system",
-            text,
+            content: { type: 'text', content: text },
             timestamp: Date.now(),
             isSystem: true
         }]);
     };
 
-    const sendMessage = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const sendMessage = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
         if (!inputValue.trim() || !socketRef.current) return;
 
         const text = inputValue;
         setInputValue("");
+        setShowEmojiPicker(false);
 
-        // Encrypt
-        const encrypted = await CryptoHelper.encrypt(text, rawKey);
+        await sendEncryptedMessage({ type: 'text', content: text });
+    };
+
+    const sendEncryptedMessage = async (content: MessageContent) => {
+        if (!socketRef.current) return;
+
+        // Encrypt JSON string
+        const jsonString = JSON.stringify(content);
+        const encrypted = await CryptoHelper.encrypt(jsonString, rawKey);
         
         // Optimistic UI update
         setMessages(prev => [...prev, {
             id: Math.random().toString(),
             senderId: socketRef.current?.id || "me",
-            text: text,
+            content: content,
             timestamp: Date.now()
         }]);
 
         // Send
         socketRef.current.emit('msg', { ...encrypted, senderId: socketRef.current.id });
+    };
+
+    const handleEmojiClick = (emojiData: EmojiClickData) => {
+        setInputValue(prev => prev + emojiData.emoji);
+    };
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !socketRef.current) return;
+
+        // Check size (e.g. 5MB limit to be safe for now)
+        if (file.size > 5 * 1024 * 1024) {
+            alert("Image too large (max 5MB).");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+            const base64 = reader.result as string;
+            await sendEncryptedMessage({ type: 'image', content: base64 });
+        };
+        reader.readAsDataURL(file);
+        
+        // Reset input
+        e.target.value = "";
     };
 
     const copyLink = () => {
@@ -382,7 +435,7 @@ export function ChatRoom() {
                         if (msg.isSystem) {
                             return (
                                 <div key={msg.id} className="flex justify-center my-2">
-                                    <span className="text-xs text-slate-600">{msg.text}</span>
+                                    <span className="text-xs text-slate-600">{msg.content.content}</span>
                                 </div>
                             );
                         }
@@ -394,10 +447,19 @@ export function ChatRoom() {
                             <div key={msg.id} className={clsx("flex flex-col max-w-[80%]", isMe ? "ml-auto items-end" : "mr-auto items-start")}>
                                 <span className="text-[10px] text-slate-500 mb-1 px-1">{isMe ? "You" : senderName}</span>
                                 <div className={clsx(
-                                    "px-4 py-2 rounded-2xl break-words",
-                                    isMe ? "bg-blue-600 text-white rounded-tr-sm" : "bg-slate-800 text-slate-200 rounded-tl-sm"
+                                    "px-4 py-2 rounded-2xl break-words overflow-hidden",
+                                    isMe ? "bg-blue-600 text-white rounded-tr-sm" : "bg-slate-800 text-slate-200 rounded-tl-sm",
+                                    msg.content.type === 'image' && "p-1" // Less padding for images
                                 )}>
-                                    {msg.text}
+                                    {msg.content.type === 'image' ? (
+                                        <img 
+                                            src={msg.content.content} 
+                                            alt="Encrypted attachment" 
+                                            className="max-w-full max-h-[300px] rounded-xl object-contain" 
+                                        />
+                                    ) : (
+                                        msg.content.content
+                                    )}
                                 </div>
                             </div>
                         );
@@ -406,12 +468,51 @@ export function ChatRoom() {
                 </div>
 
                 {/* Input */}
-                <div className="p-4 bg-slate-900 border-t border-slate-800">
-                    <form onSubmit={sendMessage} className="flex gap-2 max-w-4xl mx-auto">
+                <div className="p-4 bg-slate-900 border-t border-slate-800 relative">
+                    {/* Emoji Picker Popover */}
+                    {showEmojiPicker && (
+                        <div className="absolute bottom-20 left-4 z-50 shadow-2xl rounded-xl overflow-hidden border border-slate-700">
+                             <EmojiPicker 
+                                theme={Theme.DARK} 
+                                onEmojiClick={handleEmojiClick}
+                                width={300}
+                                height={400}
+                            />
+                        </div>
+                    )}
+
+                    <form onSubmit={sendMessage} className="flex gap-2 max-w-4xl mx-auto items-center">
+                        <button 
+                            type="button"
+                            onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                            className={clsx(
+                                "p-2 rounded-xl transition-colors", 
+                                showEmojiPicker ? "bg-slate-800 text-blue-400" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+                            )}
+                        >
+                            <Smile className="w-6 h-6" />
+                        </button>
+
+                        <button 
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors"
+                        >
+                            <ImageIcon className="w-6 h-6" />
+                        </button>
+                        <input 
+                            type="file" 
+                            ref={fileInputRef}
+                            className="hidden" 
+                            accept="image/*"
+                            onChange={handleImageSelect}
+                        />
+
                         <input
                             type="text"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
+                            onClick={() => setShowEmojiPicker(false)}
                             placeholder="Type a secure message..."
                             className="flex-1 bg-slate-800 border-slate-700 border text-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all placeholder:text-slate-600"
                         />
