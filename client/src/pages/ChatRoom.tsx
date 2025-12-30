@@ -214,9 +214,17 @@ export function ChatRoom() {
 
     const copyLink = () => {
         // Reconstruct the full URL for sharing
+        const activeKey = state?.key || "";
+        const activeServer = state?.server || "";
+
         const origin = window.location.origin;
-        const encodedServer = encodeURIComponent(serverUrl);
-        const fullLink = `${origin}/room/${roomId}?server=${encodedServer}#${rawKey}`;
+        // BASE_URL includes leading/trailing slashes (e.g., "/letschat/")
+        const base = import.meta.env.BASE_URL;
+        // Ensure we don't end up with double slashes
+        const baseUrl = `${origin}${base}`.replace(/\/$/, ""); 
+        
+        const encodedServer = encodeURIComponent(activeServer);
+        const fullLink = `${baseUrl}/room/${roomId}?server=${encodedServer}#${activeKey}`;
         
         navigator.clipboard.writeText(fullLink);
         alert("Encrypted link copied to clipboard! Share it securely.");
