@@ -53,6 +53,7 @@ export function ChatRoom() {
     const [users, setUsers] = useState<User[]>([]);
     const [status, setStatus] = useState<'connecting' | 'connected' | 'error' | 'joining'>('joining');
     const [myId, setMyId] = useState<string>("");
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
     
     const socketRef = useRef<Socket | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -498,53 +499,61 @@ export function ChatRoom() {
                                         msg.content.type === 'file' && msg.content.mimeType?.startsWith('image/') && "p-1", // Less padding for images
                                         msg.content.type === 'file' && !msg.content.mimeType?.startsWith('image/') && "min-w-[200px]"
                                     )}>
-                                        {msg.content.type === 'file' ? (
-                                            msg.content.mimeType?.startsWith('image/') ? (
-                                                <div className="relative group">
-                                                    <img 
-                                                        src={msg.content.content} 
-                                                        alt={msg.content.fileName || "Image"} 
-                                                        className="max-w-full max-h-[300px] rounded-xl object-contain" 
-                                                    />
-                                                    <a 
-                                                        href={msg.content.content} 
-                                                        download={msg.content.fileName || "image.png"}
-                                                        className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        title="Download"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                    >
-                                                        <Download className="w-4 h-4" />
-                                                    </a>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-3 p-1">
-                                                    <div className="p-2 bg-black/20 rounded-lg">
-                                                        <FileText className="w-8 h-8 opacity-80" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="text-sm font-medium truncate max-w-[150px]">{msg.content.fileName || "Unknown File"}</div>
-                                                        <div className="text-xs opacity-70">
-                                                            {formatBytes(msg.content.size || 0)}
-                                                        </div>
-                                                    </div>
-                                                    <a 
-                                                        href={msg.content.content} 
-                                                        download={msg.content.fileName || "file"}
-                                                        className="p-2 hover:bg-black/20 rounded-full transition-colors"
-                                                        title="Download"
-                                                    >
-                                                        <Download className="w-5 h-5" />
-                                                    </a>
-                                                </div>
-                                            )
+                                    {msg.content.type === 'file' ? (
+                                        msg.content.mimeType?.startsWith('image/') ? (
+                                            <div className="relative group cursor-pointer" onClick={() => setPreviewImage(msg.content.content)}>
+                                                <img 
+                                                    src={msg.content.content} 
+                                                    alt={msg.content.fileName || "Image"} 
+                                                    className="max-w-full max-h-[300px] rounded-xl object-contain hover:opacity-95 transition-opacity" 
+                                                />
+                                                <a 
+                                                    href={msg.content.content} 
+                                                    download={msg.content.fileName || "image.png"}
+                                                    className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Download"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                </a>
+                                            </div>
+                                        ) : msg.content.mimeType?.startsWith('video/') ? (
+                                            <div className="relative group min-w-[200px] max-w-[300px]">
+                                                <video 
+                                                    src={msg.content.content} 
+                                                    controls 
+                                                    className="w-full rounded-xl"
+                                                />
+                                            </div>
                                         ) : (
-                                            msg.content.content
-                                        )}
-                                    </div>
+                                            <div className="flex items-center gap-3 p-1">
+                                                <div className="p-2 bg-black/20 rounded-lg">
+                                                    <FileText className="w-8 h-8 opacity-80" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium truncate max-w-[150px]">{msg.content.fileName || "Unknown File"}</div>
+                                                    <div className="text-xs opacity-70">
+                                                        {formatBytes(msg.content.size || 0)}
+                                                    </div>
+                                                </div>
+                                                <a 
+                                                    href={msg.content.content} 
+                                                    download={msg.content.fileName || "file"}
+                                                    className="p-2 hover:bg-black/20 rounded-full transition-colors"
+                                                    title="Download"
+                                                >
+                                                    <Download className="w-5 h-5" />
+                                                </a>
+                                            </div>
+                                        )
+                                    ) : (
+                                        msg.content.content
+                                    )}
                                 </div>
-                            );
-                        })}
-                        <div ref={messagesEndRef} />
+                            </div>
+                        );
+                    })}
+                    <div ref={messagesEndRef} />
                     </div>
                 </div>
 
@@ -607,6 +616,27 @@ export function ChatRoom() {
                     </form>
                 </div>
             </div>
+
+            {/* Image Preview Modal */}
+            {previewImage && (
+                <div 
+                    className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm"
+                    onClick={() => setPreviewImage(null)}
+                >
+                    <button 
+                        onClick={() => setPreviewImage(null)}
+                        className="absolute top-4 right-4 p-2 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                    >
+                        <X className="w-8 h-8" />
+                    </button>
+                    <img 
+                        src={previewImage} 
+                        alt="Preview" 
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                </div>
+            )}
         </div>
     );
 }
