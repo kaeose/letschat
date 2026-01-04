@@ -106,17 +106,30 @@ export function ChatRoom() {
                 // We combine IV and Ciphertext for transport: iv:ciphertext
                 const packedName = `${encryptedNameObj.iv}:${encryptedNameObj.ciphertext}`;
 
+                // Try to get existing session ID
+                const storedClientId = sessionStorage.getItem('letschat_client_id');
+
                 // 3. Connect Socket
                 const socket = io(serverUrl, {
                     auth: {
                         chatId: roomId,
                         token: keys.token,
-                        encryptedUsername: packedName
+                        encryptedUsername: packedName,
+                        clientId: storedClientId // Send if exists, otherwise undefined
                     }
                 });
 
                 activeSocket = socket;
                 socketRef.current = socket;
+
+                // Handle Session ID assignment from server
+                socket.on('session_set', (id: string) => {
+                    sessionStorage.setItem('letschat_client_id', id);
+                    // Update auth for future reconnections without reload
+                    if (socket.auth) {
+                        (socket.auth as any).clientId = id;
+                    }
+                });
 
                 socket.on('connect', () => {
                     if (mounted) {

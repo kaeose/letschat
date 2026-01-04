@@ -66,6 +66,7 @@ app.post('/api/room/create', (req, res) => {
 
 io.use((socket, next) => {
     const { chatId, token, encryptedUsername } = socket.handshake.auth;
+    let { clientId } = socket.handshake.auth;
     const room = rooms.get(chatId);
 
     if (room && Security.verify(token, room.serverHash)) {
@@ -73,15 +74,43 @@ io.use((socket, next) => {
             return next(new Error("Invalid encrypted username"));
         }
 
+        // If no clientId provided by client, generate a new one server-side
+        if (!clientId) {
+            clientId = crypto.randomUUID();
+            socket.isNewSession = true; // Mark as new so we can send it back
+        }
+
         socket.chatId = chatId;
         socket.encryptedUsername = encryptedUsername;
+        socket.clientId = clientId; 
         return next();
     }
     next(new Error("Authentication failed"));
 });
 
 io.on('connection', async (socket) => {
-    const { chatId, encryptedUsername } = socket;
+    const { chatId, encryptedUsername, clientId } = socket;
+
+    // Send the assigned clientId back to the client if it was generated server-side
+    // or just always ensure client has the correct one
+    socket.emit('session_set', clientId);
+
+    // 1. Check for zombie connections with same clientId in this room
+    if (clientId) {
+        const sockets = await io.in(chatId).fetchSockets();
+        for (const s of sockets) {
+            if (s.clientId === clientId && s.id !== socket.id) {
+                // Found a ghost connection from same user. Disconnect it.
+                // Note: fetchSockets() returns remote instances, we need the local socket to disconnect
+                const zombieSocket = io.sockets.sockets.get(s.id);
+                if (zombieSocket) {
+                    zombieSocket.disconnect(true); // Force disconnect
+                    console.log(`Cleaned up zombie socket ${s.id} for user ${clientId}`);
+                }
+            }
+        }
+    }
+
     socket.join(chatId);
 
     // Update room activity
