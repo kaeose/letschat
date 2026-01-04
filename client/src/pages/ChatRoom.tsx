@@ -1,14 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
-import { Send, Copy, Users, LogOut, ShieldCheck, AlertCircle, Menu, X, Smile, Image as ImageIcon } from 'lucide-react';
+import { Send, Copy, Users, LogOut, ShieldCheck, AlertCircle, Menu, X, Smile, Paperclip, FileText, Download } from 'lucide-react';
 import EmojiPicker, { type EmojiClickData, Theme } from 'emoji-picker-react';
 import { CryptoHelper } from '../lib/crypto';
 import clsx from 'clsx';
 
 interface MessageContent {
-    type: 'text' | 'image';
+    type: 'text' | 'file';
     content: string;
+    fileName?: string;
+    mimeType?: string;
+    size?: number;
 }
 
 interface Message {
@@ -175,7 +178,7 @@ export function ChatRoom() {
                         let content: MessageContent;
                         try {
                             const parsed = JSON.parse(decryptedText);
-                            if (parsed && (parsed.type === 'text' || parsed.type === 'image') && typeof parsed.content === 'string') {
+                            if (parsed && (parsed.type === 'text' || parsed.type === 'file') && typeof parsed.content === 'string') {
                                 content = parsed;
                             } else {
                                 content = { type: 'text', content: decryptedText };
@@ -263,20 +266,34 @@ export function ChatRoom() {
         setInputValue(prev => prev + emojiData.emoji);
     };
 
-    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const formatBytes = (bytes: number) => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file || !socketRef.current) return;
 
-        // Check size (e.g. 5MB limit to be safe for now)
-        if (file.size > 5 * 1024 * 1024) {
-            alert("Image too large (max 5MB).");
+        // Check size (10MB limit)
+        if (file.size > 10 * 1024 * 1024) {
+            alert("File too large (max 10MB).");
             return;
         }
 
         const reader = new FileReader();
         reader.onloadend = async () => {
             const base64 = reader.result as string;
-            await sendEncryptedMessage({ type: 'image', content: base64 });
+            await sendEncryptedMessage({ 
+                type: 'file', 
+                content: base64,
+                fileName: file.name,
+                mimeType: file.type,
+                size: file.size
+            });
         };
         reader.readAsDataURL(file);
         
@@ -462,14 +479,48 @@ export function ChatRoom() {
                                 <div className={clsx(
                                     "px-4 py-2 rounded-2xl break-words overflow-hidden",
                                     isMe ? "bg-blue-600 text-white rounded-tr-sm" : "bg-slate-800 text-slate-200 rounded-tl-sm",
-                                    msg.content.type === 'image' && "p-1" // Less padding for images
+                                    msg.content.type === 'file' && msg.content.mimeType?.startsWith('image/') && "p-1", // Less padding for images
+                                    msg.content.type === 'file' && !msg.content.mimeType?.startsWith('image/') && "min-w-[200px]"
                                 )}>
-                                    {msg.content.type === 'image' ? (
-                                        <img 
-                                            src={msg.content.content} 
-                                            alt="Encrypted attachment" 
-                                            className="max-w-full max-h-[300px] rounded-xl object-contain" 
-                                        />
+                                    {msg.content.type === 'file' ? (
+                                        msg.content.mimeType?.startsWith('image/') ? (
+                                            <div className="relative group">
+                                                <img 
+                                                    src={msg.content.content} 
+                                                    alt={msg.content.fileName || "Image"} 
+                                                    className="max-w-full max-h-[300px] rounded-xl object-contain" 
+                                                />
+                                                <a 
+                                                    href={msg.content.content} 
+                                                    download={msg.content.fileName || "image.png"}
+                                                    className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="Download"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                </a>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-3 p-1">
+                                                <div className="p-2 bg-black/20 rounded-lg">
+                                                    <FileText className="w-8 h-8 opacity-80" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-sm font-medium truncate max-w-[150px]">{msg.content.fileName || "Unknown File"}</div>
+                                                    <div className="text-xs opacity-70">
+                                                        {formatBytes(msg.content.size || 0)}
+                                                    </div>
+                                                </div>
+                                                <a 
+                                                    href={msg.content.content} 
+                                                    download={msg.content.fileName || "file"}
+                                                    className="p-2 hover:bg-black/20 rounded-full transition-colors"
+                                                    title="Download"
+                                                >
+                                                    <Download className="w-5 h-5" />
+                                                </a>
+                                            </div>
+                                        )
                                     ) : (
                                         msg.content.content
                                     )}
@@ -511,14 +562,13 @@ export function ChatRoom() {
                             onClick={() => fileInputRef.current?.click()}
                             className="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-xl transition-colors shrink-0"
                         >
-                            <ImageIcon className="w-6 h-6" />
+                            <Paperclip className="w-6 h-6" />
                         </button>
                         <input 
                             type="file" 
                             ref={fileInputRef}
                             className="hidden" 
-                            accept="image/*"
-                            onChange={handleImageSelect}
+                            onChange={handleFileSelect}
                         />
 
                         <input
