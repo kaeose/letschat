@@ -452,100 +452,103 @@ export function ChatRoom() {
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                    <div className="flex justify-center my-4">
-                        <span className="text-xs bg-slate-800 text-slate-500 px-3 py-1 rounded-full">
-                            Messages are end-to-end encrypted. Not even the server can read them.
-                        </span>
-                    </div>
-                    
-                    {messages.map((msg) => {
-                        const isMe = msg.senderId === myId;
+                <div className="flex-1 overflow-y-auto p-4">
+                    <div className="max-w-4xl mx-auto space-y-4">
+                        <div className="flex justify-center my-4">
+                            <span className="text-xs bg-slate-800 text-slate-500 px-3 py-1 rounded-full">
+                                Messages are end-to-end encrypted. Not even the server can read them.
+                            </span>
+                        </div>
                         
-                        if (msg.isSystem) {
+                        {messages.map((msg) => {
+                            const isMe = msg.senderId === myId;
+                            
+                            if (msg.isSystem) {
+                                return (
+                                    <div key={msg.id} className="flex justify-center my-2">
+                                        <span className="text-xs text-slate-600">{msg.content.content}</span>
+                                    </div>
+                                );
+                            }
+
+                            // Find sender name
+                            const senderName = users.find(u => u.id === msg.senderId)?.displayName || "Unknown";
+
                             return (
-                                <div key={msg.id} className="flex justify-center my-2">
-                                    <span className="text-xs text-slate-600">{msg.content.content}</span>
+                                <div key={msg.id} className={clsx("flex flex-col max-w-[80%]", isMe ? "ml-auto items-end" : "mr-auto items-start")}>
+                                    <span className="text-[10px] text-slate-500 mb-1 px-1">{isMe ? "You" : senderName}</span>
+                                    <div className={clsx(
+                                        "px-4 py-2 rounded-2xl break-words overflow-hidden",
+                                        isMe ? "bg-blue-600 text-white rounded-tr-sm" : "bg-slate-800 text-slate-200 rounded-tl-sm",
+                                        msg.content.type === 'file' && msg.content.mimeType?.startsWith('image/') && "p-1", // Less padding for images
+                                        msg.content.type === 'file' && !msg.content.mimeType?.startsWith('image/') && "min-w-[200px]"
+                                    )}>
+                                        {msg.content.type === 'file' ? (
+                                            msg.content.mimeType?.startsWith('image/') ? (
+                                                <div className="relative group">
+                                                    <img 
+                                                        src={msg.content.content} 
+                                                        alt={msg.content.fileName || "Image"} 
+                                                        className="max-w-full max-h-[300px] rounded-xl object-contain" 
+                                                    />
+                                                    <a 
+                                                        href={msg.content.content} 
+                                                        download={msg.content.fileName || "image.png"}
+                                                        className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        title="Download"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <Download className="w-4 h-4" />
+                                                    </a>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-3 p-1">
+                                                    <div className="p-2 bg-black/20 rounded-lg">
+                                                        <FileText className="w-8 h-8 opacity-80" />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-sm font-medium truncate max-w-[150px]">{msg.content.fileName || "Unknown File"}</div>
+                                                        <div className="text-xs opacity-70">
+                                                            {formatBytes(msg.content.size || 0)}
+                                                        </div>
+                                                    </div>
+                                                    <a 
+                                                        href={msg.content.content} 
+                                                        download={msg.content.fileName || "file"}
+                                                        className="p-2 hover:bg-black/20 rounded-full transition-colors"
+                                                        title="Download"
+                                                    >
+                                                        <Download className="w-5 h-5" />
+                                                    </a>
+                                                </div>
+                                            )
+                                        ) : (
+                                            msg.content.content
+                                        )}
+                                    </div>
                                 </div>
                             );
-                        }
-
-                        // Find sender name
-                        const senderName = users.find(u => u.id === msg.senderId)?.displayName || "Unknown";
-
-                        return (
-                            <div key={msg.id} className={clsx("flex flex-col max-w-[80%]", isMe ? "ml-auto items-end" : "mr-auto items-start")}>
-                                <span className="text-[10px] text-slate-500 mb-1 px-1">{isMe ? "You" : senderName}</span>
-                                <div className={clsx(
-                                    "px-4 py-2 rounded-2xl break-words overflow-hidden",
-                                    isMe ? "bg-blue-600 text-white rounded-tr-sm" : "bg-slate-800 text-slate-200 rounded-tl-sm",
-                                    msg.content.type === 'file' && msg.content.mimeType?.startsWith('image/') && "p-1", // Less padding for images
-                                    msg.content.type === 'file' && !msg.content.mimeType?.startsWith('image/') && "min-w-[200px]"
-                                )}>
-                                    {msg.content.type === 'file' ? (
-                                        msg.content.mimeType?.startsWith('image/') ? (
-                                            <div className="relative group">
-                                                <img 
-                                                    src={msg.content.content} 
-                                                    alt={msg.content.fileName || "Image"} 
-                                                    className="max-w-full max-h-[300px] rounded-xl object-contain" 
-                                                />
-                                                <a 
-                                                    href={msg.content.content} 
-                                                    download={msg.content.fileName || "image.png"}
-                                                    className="absolute top-2 right-2 p-1.5 bg-black/50 hover:bg-black/70 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity"
-                                                    title="Download"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                >
-                                                    <Download className="w-4 h-4" />
-                                                </a>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-3 p-1">
-                                                <div className="p-2 bg-black/20 rounded-lg">
-                                                    <FileText className="w-8 h-8 opacity-80" />
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="text-sm font-medium truncate max-w-[150px]">{msg.content.fileName || "Unknown File"}</div>
-                                                    <div className="text-xs opacity-70">
-                                                        {formatBytes(msg.content.size || 0)}
-                                                    </div>
-                                                </div>
-                                                <a 
-                                                    href={msg.content.content} 
-                                                    download={msg.content.fileName || "file"}
-                                                    className="p-2 hover:bg-black/20 rounded-full transition-colors"
-                                                    title="Download"
-                                                >
-                                                    <Download className="w-5 h-5" />
-                                                </a>
-                                            </div>
-                                        )
-                                    ) : (
-                                        msg.content.content
-                                    )}
-                                </div>
-                            </div>
-                        );
-                    })}
-                    <div ref={messagesEndRef} />
+                        })}
+                        <div ref={messagesEndRef} />
+                    </div>
                 </div>
 
                 {/* Input */}
-                <div className="p-2 md:p-4 bg-slate-900 border-t border-slate-800 relative shrink-0">
-                    {/* Emoji Picker Popover */}
-                    {showEmojiPicker && (
-                        <div className="absolute bottom-20 left-4 z-50 shadow-2xl rounded-xl overflow-hidden border border-slate-700">
-                             <EmojiPicker 
-                                theme={Theme.DARK} 
-                                onEmojiClick={handleEmojiClick}
-                                width={300}
-                                height={400}
-                            />
-                        </div>
-                    )}
+                <div className="p-2 md:p-4 bg-slate-900 border-t border-slate-800 shrink-0">
+                    <form onSubmit={sendMessage} className="flex gap-1 md:gap-2 max-w-4xl mx-auto items-center relative">
+                        {/* Emoji Picker Popover - Now aligned with the form */}
+                        {showEmojiPicker && (
+                            <div className="absolute bottom-full mb-2 left-0 z-50 shadow-2xl rounded-xl overflow-hidden border border-slate-700">
+                                 <EmojiPicker 
+                                    theme={Theme.DARK} 
+                                    onEmojiClick={handleEmojiClick}
+                                    width={300}
+                                    height={400}
+                                    autoFocusSearch={false}
+                                />
+                            </div>
+                        )}
 
-                    <form onSubmit={sendMessage} className="flex gap-1 md:gap-2 max-w-4xl mx-auto items-center">
                         <button 
                             type="button"
                             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
