@@ -38,8 +38,9 @@ export function ChatRoom() {
     // We try to grab them from state first (clean URL mode), then from URL (first load)
     const urlSearchParams = new URLSearchParams(search);
     
+    const DEFAULT_SERVER = "https://letschat-03sh.onrender.com";
     const rawKey = state?.key || (hash.length > 1 ? hash.substring(1) : "");
-    const serverUrl = state?.server || urlSearchParams.get('server') || 'http://localhost:3001';
+    const serverUrl = state?.server || urlSearchParams.get('server') || DEFAULT_SERVER;
     
     // State
     const [username, setUsername] = useState<string>(state?.username || "");
@@ -304,7 +305,7 @@ export function ChatRoom() {
     const copyLink = () => {
         // Reconstruct the full URL for sharing
         const activeKey = state?.key || "";
-        const activeServer = state?.server || "";
+        const activeServer = state?.server || DEFAULT_SERVER;
 
         const origin = window.location.origin;
         // BASE_URL includes leading/trailing slashes (e.g., "/letschat/")
@@ -312,8 +313,14 @@ export function ChatRoom() {
         // Ensure we don't end up with double slashes
         const baseUrl = `${origin}${base}`.replace(/\/$/, ""); 
         
-        const encodedServer = encodeURIComponent(activeServer);
-        const fullLink = `${baseUrl}/room/${roomId}?server=${encodedServer}#${activeKey}`;
+        let fullLink = `${baseUrl}/room/${roomId}`;
+        
+        // Only append server param if it is NOT the default server
+        if (activeServer !== DEFAULT_SERVER) {
+            fullLink += `?server=${encodeURIComponent(activeServer)}`;
+        }
+        
+        fullLink += `#${activeKey}`;
         
         navigator.clipboard.writeText(fullLink);
         alert("Encrypted link copied to clipboard! Share it securely.");
@@ -406,6 +413,14 @@ export function ChatRoom() {
                 </div>
                 
                 <div className="flex-1 overflow-y-auto">
+                    <button 
+                        onClick={copyLink}
+                        className="w-full flex items-center gap-3 px-3 py-2 bg-blue-600/10 hover:bg-blue-600/20 text-blue-400 rounded-xl mb-6 transition-colors border border-blue-600/20 text-sm font-medium"
+                    >
+                        <Copy className="w-4 h-4" />
+                        Copy Room Link
+                    </button>
+
                     <div className="flex items-center gap-2 text-slate-500 mb-4 text-sm uppercase tracking-wider font-semibold">
                         <Users className="w-4 h-4" />
                         <span>Online ({users.length})</span>
